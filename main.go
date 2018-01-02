@@ -1,7 +1,7 @@
 package main
 
 import (
-	"CachedProxy/ticketdata"
+	"CachedTickets/ticketdata"
 	"crypto/tls"
 	"encoding/json"
 	"flag"
@@ -60,15 +60,15 @@ func grab12306(ch *chan string, url string) string {
 	return result
 }
 
-func updateCacheHandler(w http.ResponseWriter, r *http.Request) {
+func (env *Env) updateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("updateCacheHandler")
 }
 
-func showWorkingHandler(w http.ResponseWriter, r *http.Request) {
+func (env *Env) showWorkingHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Cached Proxy Server is running!")
 }
 
-func queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) {
+func (env *Env) queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	trainNo := getQueryParam(r, "train_no")
 	from := getQueryParam(r, "from_station_no")
@@ -99,7 +99,7 @@ func queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func queryHandler(w http.ResponseWriter, r *http.Request) {
+func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	date := getQueryParam(r, "leftTicketDTO.train_date")
 	from := getQueryParam(r, "leftTicketDTO.from_station")
@@ -164,14 +164,14 @@ func main() {
 	env := &Env{db}
 
 	r := mux.NewRouter()
-	r.HandleFunc("/query", queryHandler)
-	r.HandleFunc("/queryTicketPrice", queryTicketPriceHandler)
-	r.HandleFunc("/", showWorkingHandler)
-	r.HandleFunc("/update_cache", updateCacheHandler)
+	r.HandleFunc("/query", env.queryHandler)
+	r.HandleFunc("/queryTicketPrice", env.queryTicketPriceHandler)
+	r.HandleFunc("/", env.showWorkingHandler)
+	r.HandleFunc("/update_cache", env.updateCacheHandler)
 	http.Handle("/", r)
 
 	log.Printf("Cached Proxy Server starts up, serving on port: %d", *port)
-	err := http.ListenAndServe(":"+strconv.Itoa(*port), nil)
+	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 
 	if err != nil {
 		log.Fatal("Fail to start server: ", err)
