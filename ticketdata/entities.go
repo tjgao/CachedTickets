@@ -25,47 +25,81 @@ type TicketPriceEntity struct {
 	//	TrainDate     string `db:"train_date"`
 }
 
-func (db *DB) GetLeftTickets(from string, to string, date string) (string, error) {
-	row, err := db.Query("select content from tickets where from_station = ? and to_station = ? and travel_date = ?", from, to, date)
-	var content string
+func (db *DB) GetLeftTickets(t *TicketEntity) (*TicketEntity, error) {
+	stmt, err := db.Prepare("select * from tickets where from_station = $1 and to_station = $2 and travel_date = $3")
+	defer stmt.Close()
+
 	if err != nil {
 		log.Printf("%v", err)
-		return content, err
+		return t, err
 	}
-	defer row.Close()
-	for row.Next() {
-		if err := row.Scan(&content); err != nil {
-			log.Printf("%v", err)
-			return content, err
-		}
-		break
-	}
-	return content, nil
+	err = stmt.QueryRow(t.From, t.To, t.Date).Scan(t)
+
+	return t, err
 }
 
 // insert or update, depending on the availability of this particular entry.
-func (db *DB) SaveLeftTickets(from string, to string, date string, content string) error {
-	stmt, err := db.Prepare("insert into tickets (from_station, to_station, travel_date, content) values ($1, $2, $3, $4)")
+func (db *DB) SaveLeftTickets(t *TicketEntity) error {
+	stmt, err := db.Prepare("insert into tickets (from_station, to_station, travel_date, content, update_time) values ($1, $2, $3, $4, now())")
+	defer stmt.Close()
 	if err != nil {
 		log.Printf("%v", err)
 		return err
 	}
 
+	_, err = stmt.Exec(t.From, t.To, t.Date, t.Content)
+	if err != nil {
+		// we try to update it
+		updateStmt, err := db.Prepare("update tickets set content = $1, update_time = now() where from_station = $2 and to_station = $3 and travel_date = $4")
+		defer updateStmt.Close()
+
+		if err != nil {
+			log.Printf("%v", err)
+			return err
+		}
+
+		_, err = updateStmt.Exec(t.Content, t.From, t.To, t.Date)
+		return err
+	}
+	return nil
 }
 
-func (db *DB) GetTicketPrice(train_no string, from_station_no string, to_station_no string, seat_types string) (string, error) {
-	row, err := db.Query("select content from ticket_price where train_no = ? and from_station_no = ? and to_station_no = ? and seat_types = ?",
-		train_no, from_station_no, to_station_no, seat_types)
-	var content string
+func (db *DB) GetTicketPrice(t *TicketPriceEntity) (*TicketPriceEntity, error) {
+	stmt, err := db.Prepare("select * from ticket_price where train_no = $1 and from_station_no = $2 and to_station_no = $3 and seat_types = $4")
+	defer stmt.Close()
+
 	if err != nil {
-		return content, err
+		log.Printf("%v", err)
+		return t, err
 	}
-	defer row.Close()
-	for row.Next() {
-		if err := row.Scan(&content); err != nil {
-			return content, err
+
+	err = stmt.QueryRow(t.TrainNo, t.FromStationNo, t.ToStationNo, t.SeatTypes).Scan(t)
+
+	return t, err
+}
+
+// insert or update
+func (db *DB) SaveTicketPrice(t *TicketPriceEntity) error {
+	stmt, err := db.Prepare("insert into ticket_price (train_no, from_station_no, to_station_no, seat_types, content, update_time) values ($1, $2, $3, $4, $5, now())")
+	defer stmt.Close()
+	if err != nil {
+		log.Printf("%v", err)
+		return err
+	}
+
+	_, err = stmt.Exec(t.TrainNo, t.FromStationNo, t.ToStationNo, t.SeatTypes, t.Content)
+	if err != nil {
+		// try update
+		updateStmt, err := db.Prepare("update ticket_price set content = $1, update_time = now() where train_no = $2 and from_station_no = $3 and to_station_no = $4 and seat_types = $5")
+		defer updateStmt.Close()
+
+		if err != nil {
+			log.Printf("%v", err)
+			return err
 		}
-		break
+
+		_, err = updateStmt.Exec(t.Content, t.TrainNo, t.FromStationNo, t.ToStationNo, t.SeatTypes)
+		return err
 	}
-	return content, nil
+	return nil
 }

@@ -6,8 +6,10 @@ import (
 )
 
 type TicketInfo interface {
-	GetLeftTickets(string, string, string) (string, error)
-	GetTicketPrice(string, string, string, string) (string, error)
+	GetLeftTickets(t *TicketEntity) (*TicketEntity, error)
+	SaveLeftTickets(t *TicketEntity) error
+	GetTicketPrice(t *TicketPriceEntity) (*TicketPriceEntity, error)
+	SaveTicketPrice(t *TicketPriceEntity) error
 }
 
 type DB struct {
