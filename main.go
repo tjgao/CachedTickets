@@ -25,6 +25,20 @@ type URLChangeMsg struct {
 	Name   string `json:"c_name"`
 }
 
+type TicketsData struct {
+	Flag string            `json:"flag"`
+	Map  map[string]string `json:"map"`
+}
+
+type LeftTicketsJson struct {
+	HttpStatus int         `json:"httpstatus"`
+	Messages   string      `json:"messages"`
+	Status     bool        `json:"status"`
+	Result     []string    `json:"result"`
+	Data       TicketsData `json:"data"`
+	UpdateTime int64       `json:"updatetime"`
+}
+
 func getQueryParam(r *http.Request, name string) string {
 	value, existed := r.Form[name]
 	if !existed {
@@ -99,6 +113,33 @@ func (env *Env) queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func verifyTickets(content *string) (*LeftTicketsJson, error) {
+	var js LeftTicketsJson
+	err := json.Unmarshal([]byte(*content), &js)
+	return &js, err
+}
+
+func (env *Env) saveTicketsToDB(t *ticketdata.TicketEntity, js *LeftTicketsJson) error {
+	js.UpdateTime = time.Now().Unix()
+	bs, err := json.Marshal(&js)
+	if err != nil {
+		log.Printf("Severe problem! Unable to marshal json with update time field")
+		return err
+	}
+	t.Content = string(bs)
+	return env.db.SaveLeftTickets(t)
+}
+
+func (env *Env) getTicketsFromDB(w http.ResponseWriter, t *ticketdata.TicketEntity) error {
+	_, err := env.db.GetLeftTickets(t)
+	if err != nil {
+		w.Write([]byte("{}"))
+	} else {
+		w.Write([]byte(t.Content))
+	}
+	return err
+}
+
 func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	date := getQueryParam(r, "leftTicketDTO.train_date")
@@ -106,6 +147,7 @@ func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 	to := getQueryParam(r, "leftTicketDTO.to_station")
 	codes := getQueryParam(r, "purpose_codes")
 
+	t := ticketdata.TicketEntity{0, from, to, date, "", time.Now()}
 	w.Header().Set("Content-Type", "application/json")
 	if len(date)*len(from)*len(to)*len(codes) == 0 {
 		w.Write([]byte("{}"))
@@ -122,10 +164,8 @@ func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 		case res := <-ch:
 			msg := new(URLChangeMsg)
 			err := json.Unmarshal([]byte(res), &msg)
-			log.Printf(res)
 			if err != nil {
-				log.Printf("Cannot decode data: %v\n", err)
-				w.Write([]byte(res))
+				env.getTicketsFromDB(w, &t)
 				return
 			}
 			if !msg.Status && len(msg.Url) > 0 {
@@ -137,16 +177,30 @@ func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 				go grab12306(&newch, newurl)
 				select {
 				case newres := <-newch:
-					w.Write([]byte(newres))
+					js, e := verifyTickets(&newres)
+					if e != nil {
+						env.getTicketsFromDB(w, &t)
+					} else {
+						w.Write([]byte(res))
+						env.saveTicketsToDB(&t, js)
+					}
 				case <-time.After(time.Second * 10):
-					w.Write([]byte("{\"result\":\"timeout\"}"))
+					log.Printf("Timeout !")
+					env.getTicketsFromDB(w, &t)
 				}
 
 			} else {
-				w.Write([]byte(res))
+				js, e := verifyTickets(&res)
+				if e != nil {
+					env.getTicketsFromDB(w, &t)
+				} else {
+					w.Write([]byte(res))
+					env.saveTicketsToDB(&t, js)
+				}
 			}
 		case <-time.After(time.Second * 10):
-			w.Write([]byte("{\"result\":\"timeout\"}"))
+			log.Printf("Timeout !")
+			env.getTicketsFromDB(w, &t)
 		}
 	}
 }

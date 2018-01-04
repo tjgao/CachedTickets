@@ -6,12 +6,12 @@ import (
 )
 
 type TicketEntity struct {
-	Id        int64     `db:"id"`
-	From      string    `db:"from_station"`
-	To        string    `db:"to_station"`
-	Date      string    `db:"travel_date"`
-	Content   string    `db:"content"`
-	TimeStamp time.Time `db:"update_time"`
+	Id         int64     `db:"id"`
+	From       string    `db:"from_station"`
+	To         string    `db:"to_station"`
+	Date       string    `db:"travel_date"`
+	Content    string    `db:"content"`
+	UpdateTime time.Time `db:"update_time"`
 }
 
 type TicketPriceEntity struct {
@@ -21,7 +21,7 @@ type TicketPriceEntity struct {
 	ToStationNo   string    `db:"to_station_no"`
 	SeatTypes     string    `db:"seat_types"`
 	Content       string    `db:"content"`
-	TimeStamp     time.Time `db:"update_time"`
+	UpdateTime    time.Time `db:"update_time"`
 	//	TrainDate     string `db:"train_date"`
 }
 
