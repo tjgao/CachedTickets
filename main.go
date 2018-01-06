@@ -4,6 +4,7 @@ import (
 	"CachedTickets/ticketdata"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -26,17 +27,27 @@ type URLChangeMsg struct {
 }
 
 type TicketsData struct {
-	Flag string            `json:"flag"`
-	Map  map[string]string `json:"map"`
+	Flag   string            `json:"flag"`
+	Map    map[string]string `json:"map"`
+	Result []string          `json:"result"`
 }
 
 type LeftTicketsJson struct {
 	HttpStatus int         `json:"httpstatus"`
 	Messages   string      `json:"messages"`
 	Status     bool        `json:"status"`
-	Result     []string    `json:"result"`
 	Data       TicketsData `json:"data"`
 	UpdateTime int64       `json:"updatetime"`
+}
+
+type TicketPriceJson struct {
+	ValidateMessagesShowId string                 `json:"ValidateMessagesShowId"`
+	Status                 bool                   `json:"status"`
+	HttpStatus             int                    `json:"httpstatus"`
+	Data                   map[string]interface{} `json:"data"`
+	Messages               []string               `json:"messages"`
+	ValidateMessages       interface{}            `json:"validateMessages"`
+	UpdateTime             int64                  `json:"updatetime"`
 }
 
 func getQueryParam(r *http.Request, name string) string {
@@ -82,6 +93,35 @@ func (env *Env) showWorkingHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Cached Proxy Server is running!")
 }
 
+func (env *Env) saveTicketPriceToDB(t *ticketdata.TicketPriceEntity, js *TicketPriceJson) error {
+	js.UpdateTime = time.Now().Unix()
+	bs, err := json.Marshal(&js)
+	if err != nil {
+		log.Printf("Severe problem! Unable to marshal json with update time field")
+		return err
+	}
+	t.Content = string(bs)
+	return env.db.SaveTicketPrice(t)
+}
+
+func (env *Env) getTicketPriceFromDB(w http.ResponseWriter, t *ticketdata.TicketPriceEntity) error {
+	_, err := env.db.GetTicketPrice(t)
+	if err != nil {
+		w.Write([]byte("{}"))
+	} else {
+		w.Write([]byte(t.Content))
+	}
+	return err
+}
+
+func verifyTicketPrice(content *string) (*TicketPriceJson, error) {
+	var js TicketPriceJson
+	err := json.Unmarshal([]byte(*content), &js)
+	if !js.Status {
+		err = errors.New("Returned ticket price json does not contain data!")
+	}
+	return &js, err
+}
 func (env *Env) queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	trainNo := getQueryParam(r, "train_no")
@@ -90,6 +130,7 @@ func (env *Env) queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) 
 	seatType := getQueryParam(r, "seat_types")
 	date := getQueryParam(r, "train_date")
 
+	t := ticketdata.TicketPriceEntity{0, trainNo, from, to, seatType, "", time.Now()}
 	w.Header().Set("Content-Type", "application/json")
 	if len(trainNo)*len(from)*len(to)*len(seatType)*len(date) == 0 {
 		log.Printf("No enough params")
@@ -99,14 +140,19 @@ func (env *Env) queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) 
 			"&from_station_no=" + from + "&to_station_no=" + to + "&seat_types=" + seatType +
 			"&train_date=" + date
 
-		log.Printf(url)
 		ch := make(chan string)
 
 		go grab12306(&ch, url)
 
 		select {
 		case res := <-ch:
-			w.Write([]byte(res))
+			js, err := verifyTicketPrice(&res)
+			if err != nil {
+				env.getTicketPriceFromDB(w, &t)
+			} else {
+				w.Write([]byte(res))
+				env.saveTicketPriceToDB(&t, js)
+			}
 		case <-time.After(time.Second * 10):
 			w.Write([]byte("{\"result\":\"timeout\"}"))
 		}
@@ -116,6 +162,9 @@ func (env *Env) queryTicketPriceHandler(w http.ResponseWriter, r *http.Request) 
 func verifyTickets(content *string) (*LeftTicketsJson, error) {
 	var js LeftTicketsJson
 	err := json.Unmarshal([]byte(*content), &js)
+	if !js.Status || js.HttpStatus != 200 {
+		err = errors.New("Returned ticket json does not contain data!")
+	}
 	return &js, err
 }
 
@@ -133,6 +182,7 @@ func (env *Env) saveTicketsToDB(t *ticketdata.TicketEntity, js *LeftTicketsJson)
 func (env *Env) getTicketsFromDB(w http.ResponseWriter, t *ticketdata.TicketEntity) error {
 	_, err := env.db.GetLeftTickets(t)
 	if err != nil {
+		log.Print(err)
 		w.Write([]byte("{}"))
 	} else {
 		w.Write([]byte(t.Content))
@@ -178,10 +228,11 @@ func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 				select {
 				case newres := <-newch:
 					js, e := verifyTickets(&newres)
+					e = errors.New("fff")
 					if e != nil {
 						env.getTicketsFromDB(w, &t)
 					} else {
-						w.Write([]byte(res))
+						w.Write([]byte(newres))
 						env.saveTicketsToDB(&t, js)
 					}
 				case <-time.After(time.Second * 10):
@@ -195,7 +246,10 @@ func (env *Env) queryHandler(w http.ResponseWriter, r *http.Request) {
 					env.getTicketsFromDB(w, &t)
 				} else {
 					w.Write([]byte(res))
-					env.saveTicketsToDB(&t, js)
+					e = env.saveTicketsToDB(&t, js)
+					if e != nil {
+						log.Printf("%v", e)
+					}
 				}
 			}
 		case <-time.After(time.Second * 10):
@@ -210,6 +264,9 @@ func main() {
 	flag.Parse()
 
 	db, err := ticketdata.NewDB("postgres://dbuser:dbuser@localhost/ticket_cache")
+	if err != nil {
+		db, err = ticketdata.NewDB("user=dbuser password=dbuser dbname=ticket_cache sslmode=disable")
+	}
 
 	if err != nil {
 		log.Panic(err)
