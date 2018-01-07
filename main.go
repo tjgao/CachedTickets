@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -260,9 +261,16 @@ func (env *appEnv) queryHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	port := flag.Int("p", 8086, "Port to serve on")
-	loglevel := flag.String("l", "INFO", "Log level (DEBUG, WARNING, INFO, CRITICAL)")
-	logdst := flag.String("f", "", "Log file, if not specified, stdout will be used")
+	logfile := flag.String("f", "", "Log file path")
 	flag.Parse()
+
+	if *logfile != "" {
+		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
+		if err != nil {
+			log.Fatal("Failed to open log file ", logfile)
+		}
+		log.SetOutput(f)
+	}
 
 	db, err := ticketdata.NewDB("postgres://dbuser:dbuser@localhost/ticket_cache")
 	if err != nil {
