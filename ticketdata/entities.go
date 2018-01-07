@@ -25,6 +25,21 @@ type TicketPriceEntity struct {
 	//	TrainDate     string `db:"train_date"`
 }
 
+func (db *DB) GetAlternativeTickets(t *TicketEntity) (*TicketEntity, error) {
+	stmt, err := db.Prepare("select * from tickets where id=(select max(id) as mid from tickets where from_station = $1 and to_station = $2)")
+	defer stmt.Close()
+
+	if err != nil {
+		log.Print(err)
+		return t, err
+	}
+
+	err = stmt.QueryRow(t.From, t.To).
+		Scan(&t.Id, &t.From, &t.To, &t.Date, &t.Content, &t.UpdateTime)
+
+	return t, err
+}
+
 func (db *DB) GetLeftTickets(t *TicketEntity) (*TicketEntity, error) {
 	stmt, err := db.Prepare("select * from tickets where from_station = $1 and to_station = $2 and travel_date = $3")
 	defer stmt.Close()
@@ -36,10 +51,14 @@ func (db *DB) GetLeftTickets(t *TicketEntity) (*TicketEntity, error) {
 	err = stmt.QueryRow(t.From, t.To, t.Date).
 		Scan(&t.Id, &t.From, &t.To, &t.Date, &t.Content, &t.UpdateTime)
 
+	if err != nil {
+		// It is possible we do not have the correct data. We just try to find anything we have or good enough
+		return db.GetAlternativeTickets(t)
+	}
 	return t, err
 }
 
-// insert or update, depending on the availability of this particular entry.
+// SaveLeftTickets Save tickets info into database. insert or update, depending on the availability of this particular entry.
 func (db *DB) SaveLeftTickets(t *TicketEntity) error {
 	stmt, err := db.Prepare("insert into tickets (from_station, to_station, travel_date, content, update_time) values ($1, $2, $3, $4, now())")
 	defer stmt.Close()
