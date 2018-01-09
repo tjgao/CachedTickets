@@ -115,11 +115,30 @@ func (env *appEnv) getTicketPriceFromDB(w http.ResponseWriter, t *ticketdata.Tic
 	return err
 }
 
+func emptyTicketPriceJSON(js *ticketPriceJSON) bool {
+	// Sometimes 12306 return valid json data contains no information
+	containInfo := false
+	for k := range js.Data {
+		if k == "train_no" || k == "OT" {
+			continue
+		} else {
+			containInfo = true
+		}
+	}
+	return containInfo
+}
+
 func verifyTicketPrice(content *string) (*ticketPriceJSON, error) {
 	var js ticketPriceJSON
+	if *content == "" {
+		return &js, errors.New("got empty string from server")
+	}
 	err := json.Unmarshal([]byte(*content), &js)
+	if err != nil {
+		return &js, err
+	}
 	if !js.Status {
-		err = errors.New("returned ticket price json does not contain data,")
+		return &js, errors.New("returned ticket price json does not contain data,")
 	}
 	return &js, err
 }
@@ -162,7 +181,13 @@ func (env *appEnv) queryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 
 func verifyTickets(content *string) (*leftTicketsJSON, error) {
 	var js leftTicketsJSON
+	if *content == "" {
+		return &js, errors.New("got empty string from server")
+	}
 	err := json.Unmarshal([]byte(*content), &js)
+	if err != nil {
+		return &js, err
+	}
 	if !js.Status || js.HTTPStatus != 200 {
 		err = errors.New("returned ticket json does not contain data,")
 	}
