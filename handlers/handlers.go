@@ -112,15 +112,15 @@ func (env *AppEnv) getTicketPriceFromDB(w http.ResponseWriter, t *ticketdata.Tic
 
 func emptyTicketPriceJSON(js *ticketPriceJSON) bool {
 	// Sometimes 12306 return valid json data contains no information
-	containInfo := false
+	emptyInfo := true
 	for k := range js.Data {
 		if k == "train_no" || k == "OT" {
 			continue
 		} else {
-			containInfo = true
+			emptyInfo = false
 		}
 	}
-	return containInfo
+	return emptyInfo
 }
 
 func verifyTicketPrice(content *string) (*ticketPriceJSON, error) {
