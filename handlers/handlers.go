@@ -46,6 +46,11 @@ type ticketPriceJSON struct {
 	UpdateTime             int64                  `json:"updatetime"`
 }
 
+const (
+	queryEntry string = "leftTicket/queryZ"
+	priceEntry string = "leftTicket/queryTicketPrice"
+)
+
 func getQueryParam(r *http.Request, name string) string {
 	value, existed := r.Form[name]
 	if !existed {
@@ -103,7 +108,7 @@ func (env *AppEnv) saveTicketPriceToDB(t *ticketdata.TicketPriceEntity, js *tick
 func (env *AppEnv) getTicketPriceFromDB(w http.ResponseWriter, t *ticketdata.TicketPriceEntity) error {
 	_, err := env.Db.GetTicketPrice(t)
 	if err != nil {
-		w.Write([]byte("{}"))
+		w.Write([]byte(`{"isempty":1}`))
 	} else {
 		w.Write([]byte(t.Content))
 	}
@@ -151,7 +156,7 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 		log.Printf("No enough params")
 		w.Write([]byte("{}"))
 	} else {
-		url := "https://kyfw.12306.cn/otn/leftTicket/queryTicketPrice?train_no=" + trainNo +
+		url := "https://kyfw.12306.cn/otn/" + priceEntry + "?train_no=" + trainNo +
 			"&from_station_no=" + from + "&to_station_no=" + to + "&seat_types=" + seatType +
 			"&train_date=" + date
 
@@ -166,7 +171,9 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 				env.getTicketPriceFromDB(w, &t)
 			} else {
 				w.Write([]byte(res))
-				env.saveTicketPriceToDB(&t, js)
+				if !emptyTicketPriceJSON(js) {
+					env.saveTicketPriceToDB(&t, js)
+				}
 			}
 		case <-time.After(time.Second * 10):
 			w.Write([]byte("{\"result\":\"timeout\"}"))
@@ -204,7 +211,7 @@ func (env *AppEnv) getTicketsFromDB(w http.ResponseWriter, t *ticketdata.TicketE
 	_, err := env.Db.GetLeftTickets(t)
 	if err != nil {
 		log.Print(err)
-		w.Write([]byte("{}"))
+		w.Write([]byte(`{"isempty":1}`))
 	} else {
 		w.Write([]byte(t.Content))
 	}
@@ -221,9 +228,9 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	t := ticketdata.TicketEntity{Id: 0, From: from, To: to, Date: date, Content: "", UpdateTime: time.Now()}
 	w.Header().Set("Content-Type", "application/json")
 	if len(date)*len(from)*len(to)*len(codes) == 0 {
-		w.Write([]byte("{}"))
+		w.Write([]byte("Error, no enough params"))
 	} else {
-		url := "https://kyfw.12306.cn/otn/leftTicket/query?leftTicketDTO.train_date=" +
+		url := "https://kyfw.12306.cn/otn/" + queryEntry + "?leftTicketDTO.train_date=" +
 			date + "&leftTicketDTO.from_station=" + from + "&leftTicketDTO.to_station=" +
 			to + "&purpose_codes=" + codes
 
