@@ -142,6 +142,7 @@ func verifyTicketPrice(content *string) (*ticketPriceJSON, error) {
 	}
 	return &js, err
 }
+
 func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	trainNo := getQueryParam(r, "train_no")
@@ -161,6 +162,8 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 			"&train_date=" + date
 
 		ch := make(chan string)
+
+		log.Printf("request ticket price -> " + url)
 
 		go grab12306(&ch, url)
 
@@ -236,6 +239,7 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 
 		ch := make(chan string)
 
+		log.Printf("request train info -> " + url)
 		go grab12306(&ch, url)
 
 		select {
