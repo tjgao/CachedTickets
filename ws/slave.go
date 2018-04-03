@@ -5,11 +5,27 @@ import (
 	"log"
 )
 
+type writeJob struct {
+	data chan []byte
+	done chan struct{}
+}
+
 type Slave struct {
-	ctx  *WSContext
-	conn *websocket.Conn
-	in   chan []byte
-	out  chan []byte
+	ctx         *WSContext
+	conn        *websocket.Conn
+	in          chan *writeJob
+	out         chan []byte
+	pendingJobs map[int]*writeJob
+}
+
+func newSlave(w *WSContext, c *websocket.Conn) *Slave {
+	return &Slave{
+		ctx:         w,
+		conn:        c,
+		in:          make(chan *writeJob),
+		out:         make(chan []byte),
+		pendingJobs: make(map[int]*writeJob),
+	}
 }
 
 func (s *Slave) run() {
@@ -50,8 +66,8 @@ func (s *Slave) writeData(buf []byte) {
 func (s *Slave) write() {
 	for {
 		select {
-		case b := <-s.in:
-			err := s.conn.WriteMessage(websocket.BinaryMessage, b)
+		case job := <-s.in:
+			err := s.conn.WriteMessage(websocket.BinaryMessage, job.data)
 			if err != nil {
 				log.Printf("failed to write message: %v\n")
 			}
