@@ -23,8 +23,9 @@ const (
 
 // Slave expects messages like this and then it can parse body field according to the specified id
 type Message struct {
-	ID   MessageType
-	Body []byte
+	ID      MessageType
+	TransID int64
+	Body    []byte
 }
 
 // RegisterResp: When slave connects it should expect this as the first message from master
@@ -35,16 +36,14 @@ type RegisterResp struct {
 
 // Task: server will ask slave to do some task
 type Task struct {
-	TransactionID int64
-	TargetURL     string
+	TargetURL string
 }
 
 // TaskResult: when task is done, slave replies to master
 type TaskResult struct {
-	TransactionID int64
-	Result        []byte
-	Code          int
-	Description   string
+	Result      []byte
+	Code        int
+	Description string
 }
 
 // LeaveReq: the slave wants to exit
@@ -69,6 +68,12 @@ func EncodeTaskResult(msg *TaskResult) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func DecodeTaskResult(buf []byte, msg *TaskResult) error {
+	var newBuf = bytes.NewBuffer(buf)
+	e := gob.NewDecoder(newBuf)
+	return e.Decode(*msg)
+}
+
 func Decode(buf []byte, msg *Message) error {
 	var newBuf = bytes.NewBuffer(buf)
 	e := gob.NewDecoder(newBuf)
@@ -79,6 +84,15 @@ func DecodeRegisterResp(buf []byte, msg *RegisterResp) error {
 	var newBuf = bytes.NewBuffer(buf)
 	e := gob.NewDecoder(newBuf)
 	return e.Decode(*msg)
+}
+
+func EncodeTask(task *Task) ([]byte, error) {
+	var buf bytes.Buffer
+	e := gob.NewEncoder(&buf)
+	if err := e.Encode(*task); err != nil {
+		return []byte{}, err
+	}
+	return buf.Bytes(), nil
 }
 
 func DecodeTask(buf []byte, msg *Task) error {
