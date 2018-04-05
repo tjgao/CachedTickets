@@ -1,8 +1,10 @@
 package ws
 
 import (
+	"github.com/gorilla/websocket"
 	"log"
 	"math/rand"
+	"net/http"
 	"time"
 )
 
@@ -67,9 +69,7 @@ func (w *WSContext) run() {
 }
 
 func (w *WSContext) getOneSlave() (*Slave, error) {
-	go func() {
-		w.one <- true
-	}()
+	w.one <- true
 
 	select {
 	case s := <-w.picked:
@@ -77,4 +77,30 @@ func (w *WSContext) getOneSlave() (*Slave, error) {
 	case <-time.After(time.Second):
 		return nil, nil
 	}
+}
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+func wsWork(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	slave := &Slave{
+		ctx:         ctx,
+		conn:        conn,
+		in:          make(chan *writeJob),
+		out:         make(chan *Message),
+		toWrite:     make(chan *writeJob),
+		pendingJobs: make(map[int64]*writeJob),
+	}
+
+	ctx.register <- slave
+
+	go slave.run()
 }
