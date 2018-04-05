@@ -127,12 +127,12 @@ func (s *Slave) writeData(m *Message) (*Message, error) {
 	select {
 	case msg := <-job.resp:
 		return msg, nil
-	case <-time.After(8 * time.Second):
+	case <-time.After(6 * time.Second):
 		return nil, errors.New("timeout while waiting for response")
 	}
 }
 
-func (s *Slave) SendTask(url string) (*TaskResult, error) {
+func (s *Slave) DoTask(url string) (*TaskResult, error) {
 	t := Task{
 		TargetURL: url,
 	}
