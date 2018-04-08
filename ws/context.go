@@ -28,7 +28,7 @@ type WSContext struct {
 	picked chan *Slave
 }
 
-func newWSContext() *WSContext {
+func NewWSContext() *WSContext {
 	return &WSContext{
 		slaves:     make(map[*Slave]bool),
 		slaveList:  make([]*Slave, 20),
@@ -39,12 +39,12 @@ func newWSContext() *WSContext {
 	}
 }
 
-func (w *WSContext) randomRetrieve() *Slave {
+func (w *WSContext) RandomRetrieve() *Slave {
 	idx := rand.Intn(len(w.slaveList))
 	return w.slaveList[idx]
 }
 
-func (w *WSContext) run() {
+func (w *WSContext) Run() {
 	for {
 		select {
 		case s := <-w.register:
@@ -63,7 +63,7 @@ func (w *WSContext) run() {
 				}
 			}
 		case <-w.one:
-			w.picked <- w.randomRetrieve()
+			w.picked <- w.RandomRetrieve()
 		}
 	}
 }
@@ -84,7 +84,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-func wsWork(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
+func WSConnHandle(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)

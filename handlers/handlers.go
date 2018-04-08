@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"CachedTickets/ticketdata"
+	"CachedTickets/ws"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -13,7 +14,8 @@ import (
 )
 
 type AppEnv struct {
-	Db ticketdata.TicketInfo
+	Db  ticketdata.TicketInfo
+	Ctx *ws.WSContext
 }
 
 type urlChangeMsg struct {
@@ -60,14 +62,12 @@ func getQueryParam(r *http.Request, name string) string {
 	return value[0]
 }
 
-func grab12306(ch *chan string, url string) string {
-	defer close(*ch)
-
+func grab12306L(ch chan []byte, url string) []byte {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
-	var result string
+	var result []byte
 	client := &http.Client{Transport: tr}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -80,10 +80,29 @@ func grab12306(ch *chan string, url string) string {
 			log.Printf("Failed to read results from http response: %v\n", err)
 		}
 
-		result = string(b)
+		result = b
 	}
-	*ch <- result
+	ch <- result
 	return result
+}
+
+func (env *AppEnv) grab12306(ch chan []byte, url string) []byte {
+	if env.Ctx != nil {
+		// find a slave
+		var ret []byte
+		slave := env.Ctx.RandomRetrieve()
+		if slave != nil {
+			result, err := slave.DoTask(url)
+			if err != nil && result.Code == 0 {
+				ch <- nil
+			} else {
+				ret = result.Result
+				ch <- ret
+			}
+		}
+		return ret
+	}
+	return grab12306L(ch, url)
 }
 
 func (env *AppEnv) UpdateCacheHandler(w http.ResponseWriter, r *http.Request) {
@@ -161,14 +180,15 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 			"&from_station_no=" + from + "&to_station_no=" + to + "&seat_types=" + seatType +
 			"&train_date=" + date
 
-		ch := make(chan string)
+		ch := make(chan []byte)
 
 		log.Printf("request ticket price -> " + url)
 
-		go grab12306(&ch, url)
+		go env.grab12306(ch, url)
 
 		select {
-		case res := <-ch:
+		case b := <-ch:
+			res := string(b)
 			js, err := verifyTicketPrice(&res)
 			if err != nil {
 				env.getTicketPriceFromDB(w, &t)
@@ -237,13 +257,14 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 			date + "&leftTicketDTO.from_station=" + from + "&leftTicketDTO.to_station=" +
 			to + "&purpose_codes=" + codes
 
-		ch := make(chan string)
+		ch := make(chan []byte)
 
 		log.Printf("request train info -> " + url)
-		go grab12306(&ch, url)
+		go env.grab12306(ch, url)
 
 		select {
-		case res := <-ch:
+		case b := <-ch:
+			res := string(b)
 			msg := new(urlChangeMsg)
 			err := json.Unmarshal([]byte(res), &msg)
 			if err != nil {
@@ -255,10 +276,11 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 					date + "&leftTicketDTO.from_station=" + from + "&leftTicketDTO.to_station=" +
 					to + "&purpose_codes=" + codes
 
-				newch := make(chan string)
-				go grab12306(&newch, newurl)
+				newch := make(chan []byte)
+				go env.grab12306(newch, newurl)
 				select {
-				case newres := <-newch:
+				case nb := <-newch:
+					newres := string(nb)
 					js, e := verifyTickets(&newres)
 					if e != nil {
 						env.getTicketsFromDB(w, &t)

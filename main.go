@@ -3,6 +3,7 @@ package main
 import (
 	"CachedTickets/handlers"
 	"CachedTickets/ticketdata"
+	"CachedTickets/ws"
 	"flag"
 	"log"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 func main() {
 	port := flag.Int("p", 8086, "Port to serve on")
 	logfile := flag.String("f", "", "Log file path")
+	slaveSupport := flag.Bool("s", false, "Turn on slave mode")
+
 	flag.Parse()
 
 	if *logfile != "" {
@@ -34,13 +37,25 @@ func main() {
 		log.Panic(err)
 	}
 
-	env := &handlers.AppEnv{db}
+	var ctx *ws.WSContext = nil
+
+	if *slaveSupport {
+		ctx = ws.NewWSContext()
+		go ctx.Run()
+	}
+	env := &handlers.AppEnv{
+		Db:  db,
+		Ctx: ctx,
+	}
 
 	r := mux.NewRouter()
 	r.HandleFunc("/query", env.QueryHandler)
 	r.HandleFunc("/queryTicketPrice", env.QueryTicketPriceHandler)
 	r.HandleFunc("/", env.ShowWorkingHandler)
 	r.HandleFunc("/update_cache", env.UpdateCacheHandler)
+	r.HandleFunc("ws/register", func(w http.ResponseWriter, r *http.Request) {
+		ws.WSConnHandle(ctx, w, r)
+	})
 	http.Handle("/", r)
 
 	log.Printf("Cached Proxy Server starts up, serving on port: %d", *port)

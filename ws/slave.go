@@ -122,7 +122,9 @@ func (s *Slave) writeData(m *Message) (*Message, error) {
 		resp: make(chan *Message),
 	}
 
-	s.in <- &job
+	go func() {
+		s.in <- &job
+	}()
 
 	select {
 	case msg := <-job.resp:
