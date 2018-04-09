@@ -21,6 +21,7 @@ type Slave struct {
 	toWrite     chan *writeJob
 	pendingJobs map[int64]*writeJob
 	nextTransID int64
+	exit        chan struct{}
 }
 
 func newSlave(w *WSContext, c *websocket.Conn) *Slave {
@@ -32,6 +33,7 @@ func newSlave(w *WSContext, c *websocket.Conn) *Slave {
 		toWrite:     make(chan *writeJob),
 		pendingJobs: make(map[int64]*writeJob),
 		nextTransID: 0,
+		exit:        make(chan struct{}),
 	}
 }
 
@@ -58,6 +60,8 @@ func (s *Slave) bridge() {
 				job.resp <- dataResp
 				delete(pendingJobs, dataResp.TransID)
 			}
+		case <-s.exit:
+			return
 		}
 	}
 }
@@ -75,6 +79,8 @@ func (s *Slave) write() {
 					log.Printf("failed to write message: %v\n")
 				}
 			}
+		case <-s.exit:
+			return
 		}
 	}
 }
@@ -94,6 +100,7 @@ func (s *Slave) read() {
 
 		if err != nil {
 			log.Printf("ws read error: %v", err)
+			close(s.exit)
 			break
 		}
 

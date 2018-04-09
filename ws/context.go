@@ -45,6 +45,7 @@ func (w *WSContext) RandomRetrieve() *Slave {
 }
 
 func (w *WSContext) Run() {
+	rand.Seed(time.Now().UTC().UnixNano())
 	for {
 		select {
 		case s := <-w.register:

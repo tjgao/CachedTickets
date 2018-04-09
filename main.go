@@ -37,7 +37,7 @@ func main() {
 		log.Panic(err)
 	}
 
-	var ctx *ws.WSContext = nil
+	var ctx *ws.WSContext
 
 	if *slaveSupport {
 		ctx = ws.NewWSContext()
@@ -53,9 +53,11 @@ func main() {
 	r.HandleFunc("/queryTicketPrice", env.QueryTicketPriceHandler)
 	r.HandleFunc("/", env.ShowWorkingHandler)
 	r.HandleFunc("/update_cache", env.UpdateCacheHandler)
-	r.HandleFunc("ws/register", func(w http.ResponseWriter, r *http.Request) {
-		ws.WSConnHandle(ctx, w, r)
-	})
+	if *slaveSupport {
+		r.HandleFunc("ws/register", func(w http.ResponseWriter, r *http.Request) {
+			ws.WSConnHandle(ctx, w, r)
+		})
+	}
 	http.Handle("/", r)
 
 	log.Printf("Cached Proxy Server starts up, serving on port: %d", *port)
