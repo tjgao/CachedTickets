@@ -189,7 +189,6 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 		select {
 		case b := <-ch:
 			res := string(b)
-			log.Println("result  == ", res)
 			js, err := verifyTicketPrice(&res)
 			if err != nil {
 				env.getTicketPriceFromDB(w, &t)
