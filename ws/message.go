@@ -71,19 +71,19 @@ func EncodeTaskResult(msg *TaskResult) ([]byte, error) {
 func DecodeTaskResult(buf []byte, msg *TaskResult) error {
 	var newBuf = bytes.NewBuffer(buf)
 	e := gob.NewDecoder(newBuf)
-	return e.Decode(*msg)
+	return e.Decode(msg)
 }
 
 func Decode(buf []byte, msg *Message) error {
 	var newBuf = bytes.NewBuffer(buf)
 	e := gob.NewDecoder(newBuf)
-	return e.Decode(*msg)
+	return e.Decode(msg)
 }
 
 func DecodeRegisterResp(buf []byte, msg *RegisterResp) error {
 	var newBuf = bytes.NewBuffer(buf)
 	e := gob.NewDecoder(newBuf)
-	return e.Decode(*msg)
+	return e.Decode(msg)
 }
 
 func EncodeTask(task *Task) ([]byte, error) {
@@ -98,5 +98,5 @@ func EncodeTask(task *Task) ([]byte, error) {
 func DecodeTask(buf []byte, msg *Task) error {
 	var newBuf = bytes.NewBuffer(buf)
 	e := gob.NewDecoder(newBuf)
-	return e.Decode(*msg)
+	return e.Decode(msg)
 }

@@ -45,6 +45,7 @@ func (s *Slave) run() {
 
 func (s *Slave) bridge() {
 	pendingJobs := make(map[int64]*writeJob)
+OUTSIDE:
 	for {
 		select {
 		case job := <-s.in:
@@ -61,15 +62,17 @@ func (s *Slave) bridge() {
 				delete(pendingJobs, dataResp.TransID)
 			}
 		case <-s.exit:
-			return
+			break OUTSIDE
 		}
 	}
 }
 
 func (s *Slave) write() {
+OUTSIDE:
 	for {
 		select {
 		case job := <-s.toWrite:
+			job.data.TransID = job.transID
 			b, err := Encode(job.data)
 			if err != nil {
 				panic("failed to encode write data")
@@ -80,7 +83,7 @@ func (s *Slave) write() {
 				}
 			}
 		case <-s.exit:
-			return
+			break OUTSIDE
 		}
 	}
 }
@@ -89,22 +92,22 @@ func (s *Slave) read() {
 	defer func() {
 		s.ctx.unregister <- s
 		s.conn.Close()
+		if s.exit == nil {
+			log.Println("Bingo!")
+		}
+		close(s.exit)
 	}()
 
 	for {
 		t, data, err := s.conn.ReadMessage()
-		if t != websocket.BinaryMessage {
-			log.Println("Text message received, ignore")
-			continue
+		if t == websocket.BinaryMessage {
+			s.onMessage(data)
 		}
 
 		if err != nil {
 			log.Printf("ws read error: %v", err)
-			close(s.exit)
 			break
 		}
-
-		s.onMessage(data)
 	}
 }
 
@@ -136,7 +139,7 @@ func (s *Slave) writeData(m *Message) (*Message, error) {
 	select {
 	case msg := <-job.resp:
 		return msg, nil
-	case <-time.After(6 * time.Second):
+	case <-time.After(10 * time.Second):
 		return nil, errors.New("timeout while waiting for response")
 	}
 }
@@ -158,6 +161,7 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 
 	resp, e := s.writeData(&m)
 	if e != nil {
+		log.Printf("failed to write data: %v\n", err)
 		return nil, e
 	}
 
@@ -168,7 +172,7 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 	var tr TaskResult
 	e = DecodeTaskResult(resp.Body, &tr)
 	if e != nil {
-		return nil, e
+		panic("failed to decode task result")
 	}
 	return &tr, nil
 }

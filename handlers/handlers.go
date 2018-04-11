@@ -93,9 +93,9 @@ func (env *AppEnv) grab12306(ch chan []byte, url string) []byte {
 		slave := env.Ctx.RandomRetrieve()
 		if slave != nil {
 			result, err := slave.DoTask(url)
-			if err != nil && result.Code == 0 {
+			if err != nil {
 				ch <- nil
-			} else {
+			} else if result != nil {
 				ret = result.Result
 				ch <- ret
 			}
@@ -189,6 +189,7 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 		select {
 		case b := <-ch:
 			res := string(b)
+			log.Println("result  == ", res)
 			js, err := verifyTicketPrice(&res)
 			if err != nil {
 				env.getTicketPriceFromDB(w, &t)

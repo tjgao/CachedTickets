@@ -54,7 +54,7 @@ func main() {
 	r.HandleFunc("/", env.ShowWorkingHandler)
 	r.HandleFunc("/update_cache", env.UpdateCacheHandler)
 	if *slaveSupport {
-		r.HandleFunc("ws/register", func(w http.ResponseWriter, r *http.Request) {
+		r.HandleFunc("/ws/register", func(w http.ResponseWriter, r *http.Request) {
 			ws.WSConnHandle(ctx, w, r)
 		})
 	}

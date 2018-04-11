@@ -31,7 +31,7 @@ type WSContext struct {
 func NewWSContext() *WSContext {
 	return &WSContext{
 		slaves:     make(map[*Slave]bool),
-		slaveList:  make([]*Slave, 20),
+		slaveList:  make([]*Slave, 0, 20),
 		register:   make(chan *Slave),
 		unregister: make(chan *Slave),
 		one:        make(chan bool),
@@ -92,16 +92,8 @@ func WSConnHandle(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slave := &Slave{
-		ctx:         ctx,
-		conn:        conn,
-		in:          make(chan *writeJob),
-		out:         make(chan *Message),
-		toWrite:     make(chan *writeJob),
-		pendingJobs: make(map[int64]*writeJob),
-	}
-
+	slave := newSlave(ctx, conn)
 	ctx.register <- slave
 
-	go slave.run()
+	slave.run()
 }
