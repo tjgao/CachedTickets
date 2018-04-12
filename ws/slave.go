@@ -3,7 +3,7 @@ package ws
 import (
 	"errors"
 	"github.com/gorilla/websocket"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -45,6 +45,7 @@ func (s *Slave) run() {
 
 func (s *Slave) bridge() {
 	pendingJobs := make(map[int64]*writeJob)
+	log.Debug("bridge coroutine for ", s.conn.RemoteAddr(), " is running")
 OUTSIDE:
 	for {
 		select {
@@ -65,9 +66,11 @@ OUTSIDE:
 			break OUTSIDE
 		}
 	}
+	log.Debug("bridge coroutine for ", s.conn.RemoteAddr(), " exited")
 }
 
 func (s *Slave) write() {
+	log.Debug("write coroutine for ", s.conn.RemoteAddr(), " is running")
 OUTSIDE:
 	for {
 		select {
@@ -86,15 +89,14 @@ OUTSIDE:
 			break OUTSIDE
 		}
 	}
+	log.Debug("write coroutine for ", s.conn.RemoteAddr(), " exited")
 }
 
 func (s *Slave) read() {
+	log.Debug("read coroutine for ", s.conn.RemoteAddr(), " is running")
 	defer func() {
 		s.ctx.unregister <- s
 		s.conn.Close()
-		if s.exit == nil {
-			log.Println("Bingo!")
-		}
 		close(s.exit)
 	}()
 
@@ -105,10 +107,11 @@ func (s *Slave) read() {
 		}
 
 		if err != nil {
-			log.Printf("ws read error: %v", err)
+			log.Error("ws read error: %v", err)
 			break
 		}
 	}
+	log.Debug("read coroutine for ", s.conn.RemoteAddr(), " exited")
 }
 
 func (s *Slave) getNextTransID() int64 {
@@ -120,7 +123,7 @@ func (s *Slave) onMessage(data []byte) {
 	var m Message
 	err := Decode(data, &m)
 	if err != nil {
-		log.Printf("failed to decode message: %v", err)
+		log.Error("failed to decode message: ", err)
 	} else {
 		s.out <- &m
 	}
@@ -151,7 +154,7 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 
 	b, err := EncodeTask(&t)
 	if err != nil {
-		panic("failed to encode task")
+		log.Panic("failed to encode task")
 	}
 
 	m := Message{
@@ -161,7 +164,7 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 
 	resp, e := s.writeData(&m)
 	if e != nil {
-		log.Printf("failed to write data: %v\n", err)
+		log.Error("failed to write data: ", err)
 		return nil, e
 	}
 
@@ -172,7 +175,7 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 	var tr TaskResult
 	e = DecodeTaskResult(resp.Body, &tr)
 	if e != nil {
-		panic("failed to decode task result")
+		log.Panic("failed to decode task result")
 	}
 	return &tr, nil
 }

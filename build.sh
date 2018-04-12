@@ -2,6 +2,7 @@
 
 go get github.com/gorilla/mux
 go get github.com/gorilla/websocket
+go get github.com/sirupsen/logrus
 
 GOOS=linux GOARCH=amd64 go build -o ticket_cache
 

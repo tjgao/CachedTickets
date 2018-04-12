@@ -5,7 +5,7 @@ import (
 	"CachedTickets/ticketdata"
 	"CachedTickets/ws"
 	"flag"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,11 +14,26 @@ import (
 )
 
 func main() {
+	logLevelTable := map[string]log.Level{
+		"panic": log.PanicLevel,
+		"error": log.ErrorLevel,
+		"warn":  log.WarnLevel,
+		"info":  log.InfoLevel,
+		"debug": log.DebugLevel,
+	}
+
 	port := flag.Int("p", 8086, "Port to serve on")
 	logfile := flag.String("f", "", "Log file path")
 	slaveSupport := flag.Bool("s", false, "Turn on slave mode")
+	logLevel := flag.String("l", "info", "specify log level, available levels are: panic, error, warn, info and debug")
 
 	flag.Parse()
+
+	if level, ok := logLevelTable[*logLevel]; ok {
+		log.SetLevel(level)
+	} else {
+		log.Warn("unrecognized log level specified, use warn level instead")
+	}
 
 	if *logfile != "" {
 		f, err := os.OpenFile(*logfile, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0666)
@@ -60,7 +75,7 @@ func main() {
 	}
 	http.Handle("/", r)
 
-	log.Printf("Cached Proxy Server starts up, serving on port: %d", *port)
+	log.Info("Cached Proxy Server starts up, serving on port: ", *port)
 	err = http.ListenAndServe(":"+strconv.Itoa(*port), nil)
 
 	if err != nil {

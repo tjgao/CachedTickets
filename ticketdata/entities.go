@@ -1,7 +1,7 @@
 package ticketdata
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -30,7 +30,7 @@ func (db *DB) GetAlternativeTickets(t *TicketEntity) (*TicketEntity, error) {
 	defer stmt.Close()
 
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to prepare sql statement: ", err, stmt)
 		return t, err
 	}
 
@@ -45,7 +45,7 @@ func (db *DB) GetLeftTickets(t *TicketEntity) (*TicketEntity, error) {
 	defer stmt.Close()
 
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to prepare sql statement: ", err, stmt)
 		return t, err
 	}
 	err = stmt.QueryRow(t.From, t.To, t.Date).
@@ -63,19 +63,19 @@ func (db *DB) SaveLeftTickets(t *TicketEntity) error {
 	stmt, err := db.Prepare("insert into tickets (from_station, to_station, travel_date, content, update_time) values ($1, $2, $3, $4, now())")
 	defer stmt.Close()
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to prepare sql statement: ", err, stmt)
 		return err
 	}
 
 	_, err = stmt.Exec(t.From, t.To, t.Date, t.Content)
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to execute sql statement: ", err, stmt)
 		// we try to update it
 		updateStmt, err := db.Prepare("update tickets set content = $1, update_time = now() where from_station = $2 and to_station = $3 and travel_date = $4")
 		defer updateStmt.Close()
 
 		if err != nil {
-			log.Print(err)
+			log.Error("failed to prepare sql statement: ", err, updateStmt)
 			return err
 		}
 
@@ -90,7 +90,7 @@ func (db *DB) GetTicketPrice(t *TicketPriceEntity) (*TicketPriceEntity, error) {
 	defer stmt.Close()
 
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to prepare sql statement: ", err, stmt)
 		return t, err
 	}
 
@@ -105,7 +105,7 @@ func (db *DB) SaveTicketPrice(t *TicketPriceEntity) error {
 	stmt, err := db.Prepare("insert into ticket_price (train_no, from_station_no, to_station_no, seat_types, content, update_time) values ($1, $2, $3, $4, $5, now())")
 	defer stmt.Close()
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to prepare sql statement: ", err, stmt)
 		return err
 	}
 
@@ -116,7 +116,7 @@ func (db *DB) SaveTicketPrice(t *TicketPriceEntity) error {
 		defer updateStmt.Close()
 
 		if err != nil {
-			log.Print(err)
+			log.Error("failed to prepare sql statement: ", err, updateStmt)
 			return err
 		}
 

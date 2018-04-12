@@ -6,9 +6,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 )
@@ -71,13 +70,13 @@ func grab12306L(ch chan []byte, url string) []byte {
 	client := &http.Client{Transport: tr}
 	resp, err := client.Get(url)
 	if err != nil {
-		log.Printf("Failed to access url: %v\n", err)
+		log.Error("Failed to access url: ", err)
 	} else {
 		b, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 
 		if err != nil {
-			log.Printf("Failed to read results from http response: %v\n", err)
+			log.Error("Failed to read results from http response: ", err)
 		}
 
 		result = b
@@ -89,8 +88,9 @@ func grab12306L(ch chan []byte, url string) []byte {
 func (env *AppEnv) grab12306(ch chan []byte, url string) []byte {
 	if env.Ctx != nil {
 		// find a slave
+		// if returned slave is nil, that means we are using master
 		var ret []byte
-		slave := env.Ctx.RandomRetrieve()
+		slave := env.Ctx.GetOneSlave()
 		if slave != nil {
 			result, err := slave.DoTask(url)
 			if err != nil {
@@ -99,25 +99,26 @@ func (env *AppEnv) grab12306(ch chan []byte, url string) []byte {
 				ret = result.Result
 				ch <- ret
 			}
+			return ret
 		}
-		return ret
+		log.Debug("master takes the task")
 	}
 	return grab12306L(ch, url)
 }
 
 func (env *AppEnv) UpdateCacheHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("updateCacheHandler")
+	log.Info("updateCacheHandler")
 }
 
 func (env *AppEnv) ShowWorkingHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Cached Proxy Server is running!")
+	log.Info(w, "Cached Proxy Server is running!")
 }
 
 func (env *AppEnv) saveTicketPriceToDB(t *ticketdata.TicketPriceEntity, js *ticketPriceJSON) error {
 	js.UpdateTime = time.Now().Unix()
 	bs, err := json.Marshal(&js)
 	if err != nil {
-		log.Printf("Severe problem! Unable to marshal json with update time field")
+		log.Error("Severe problem! Unable to marshal json with update time field")
 		return err
 	}
 	t.Content = string(bs)
@@ -173,7 +174,7 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 	t := ticketdata.TicketPriceEntity{Id: 0, TrainNo: trainNo, FromStationNo: from, ToStationNo: to, SeatTypes: seatType, Content: "", UpdateTime: time.Now()}
 	w.Header().Set("Content-Type", "application/json")
 	if len(trainNo)*len(from)*len(to)*len(seatType)*len(date) == 0 {
-		log.Printf("No enough params")
+		log.Warn("No enough params")
 		w.Write([]byte("{}"))
 	} else {
 		url := "https://kyfw.12306.cn/otn/" + priceEntry + "?train_no=" + trainNo +
@@ -182,7 +183,7 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 
 		ch := make(chan []byte)
 
-		log.Printf("request ticket price -> " + url)
+		log.Debug("request ticket price -> " + url)
 
 		go env.grab12306(ch, url)
 
@@ -223,7 +224,7 @@ func (env *AppEnv) saveTicketsToDB(t *ticketdata.TicketEntity, js *leftTicketsJS
 	js.UpdateTime = time.Now().Unix()
 	bs, err := json.Marshal(&js)
 	if err != nil {
-		log.Printf("Severe problem! Unable to marshal json with update time field")
+		log.Error("Severe problem! Unable to marshal json with update time field")
 		return err
 	}
 	t.Content = string(bs)
@@ -233,7 +234,7 @@ func (env *AppEnv) saveTicketsToDB(t *ticketdata.TicketEntity, js *leftTicketsJS
 func (env *AppEnv) getTicketsFromDB(w http.ResponseWriter, t *ticketdata.TicketEntity) error {
 	_, err := env.Db.GetLeftTickets(t)
 	if err != nil {
-		log.Print(err)
+		log.Error("failed to get tickets from db: ", err)
 		w.Write([]byte(`{"isempty":1}`))
 	} else {
 		w.Write([]byte(t.Content))
@@ -251,6 +252,7 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 	t := ticketdata.TicketEntity{Id: 0, From: from, To: to, Date: date, Content: "", UpdateTime: time.Now()}
 	w.Header().Set("Content-Type", "application/json")
 	if len(date)*len(from)*len(to)*len(codes) == 0 {
+		log.Warn("no enough params")
 		w.Write([]byte("Error, no enough params"))
 	} else {
 		url := "https://kyfw.12306.cn/otn/" + queryEntry + "?leftTicketDTO.train_date=" +
@@ -259,7 +261,7 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 
 		ch := make(chan []byte)
 
-		log.Printf("request train info -> " + url)
+		log.Debug("request train info -> " + url)
 		go env.grab12306(ch, url)
 
 		select {
@@ -289,7 +291,7 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 						env.saveTicketsToDB(&t, js)
 					}
 				case <-time.After(time.Second * 10):
-					log.Printf("Timeout !")
+					log.Warn("Timeout !")
 					env.getTicketsFromDB(w, &t)
 				}
 
@@ -301,12 +303,12 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 					w.Write([]byte(res))
 					e = env.saveTicketsToDB(&t, js)
 					if e != nil {
-						log.Printf("%v", e)
+						log.Warn("failed to write data into db: ", e)
 					}
 				}
 			}
 		case <-time.After(time.Second * 10):
-			log.Printf("Timeout !")
+			log.Warn("Timeout !")
 			env.getTicketsFromDB(w, &t)
 		}
 	}

@@ -2,7 +2,7 @@ package ws
 
 import (
 	"github.com/gorilla/websocket"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"math/rand"
 	"net/http"
 	"time"
@@ -39,8 +39,13 @@ func NewWSContext() *WSContext {
 	}
 }
 
-func (w *WSContext) RandomRetrieve() *Slave {
-	idx := rand.Intn(len(w.slaveList))
+func (w *WSContext) randomRetrieve() *Slave {
+	l := len(w.slaveList)
+	idx := rand.Intn(l + 1)
+	log.Debug("we have ", l, " slaves, random idx is ", idx)
+	if idx == l {
+		return nil
+	}
 	return w.slaveList[idx]
 }
 
@@ -50,33 +55,35 @@ func (w *WSContext) Run() {
 		select {
 		case s := <-w.register:
 			if _, ok := w.slaves[s]; ok {
-				log.Println("error: trying to register a registered slave")
+				log.Error("error: trying to register a registered slave")
 			} else {
+				log.Info("Registered a slave server ", s.conn.RemoteAddr())
 				w.slaves[s] = true
 				w.slaveList = append(w.slaveList, s)
 			}
 		case s := <-w.unregister:
 			if _, ok := w.slaves[s]; ok {
+				log.Info("Unregistered a slave server ", s.conn.RemoteAddr())
 				delete(w.slaves, s)
-				w.slaveList = make([]*Slave, 20)
+				w.slaveList = make([]*Slave, 0, 20)
 				for key := range w.slaves {
 					w.slaveList = append(w.slaveList, key)
 				}
 			}
 		case <-w.one:
-			w.picked <- w.RandomRetrieve()
+			w.picked <- w.randomRetrieve()
 		}
 	}
 }
 
-func (w *WSContext) getOneSlave() (*Slave, error) {
+func (w *WSContext) GetOneSlave() *Slave {
 	w.one <- true
 
 	select {
 	case s := <-w.picked:
-		return s, nil
-	case <-time.After(time.Second):
-		return nil, nil
+		return s
+	case <-time.After(time.Second * 3):
+		return nil
 	}
 }
 
@@ -88,7 +95,7 @@ var upgrader = websocket.Upgrader{
 func WSConnHandle(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.Error("failed to upgrade protocol ", err)
 		return
 	}
 
