@@ -107,7 +107,7 @@ func (s *Slave) read() {
 		}
 
 		if err != nil {
-			log.Error("ws read error: %v", err)
+			log.Error("ws read error: ", err)
 			break
 		}
 	}
