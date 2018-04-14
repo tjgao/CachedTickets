@@ -1,10 +1,12 @@
 package ws
 
 import (
+	"encoding/json"
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"math/rand"
 	"net/http"
+	"sort"
 	"time"
 )
 
@@ -13,7 +15,7 @@ type WSContext struct {
 	slaves map[*Slave]bool
 
 	// slave slice: easy to randomize
-	slaveList []*Slave
+	slaveList SlaveSlice
 
 	// register req
 	register chan *Slave
@@ -26,9 +28,12 @@ type WSContext struct {
 
 	// picked slave
 	picked chan *Slave
+
+	// whether master takes requests
+	masterWork bool
 }
 
-func NewWSContext() *WSContext {
+func NewWSContext(mw bool) *WSContext {
 	return &WSContext{
 		slaves:     make(map[*Slave]bool),
 		slaveList:  make([]*Slave, 0, 20),
@@ -36,13 +41,20 @@ func NewWSContext() *WSContext {
 		unregister: make(chan *Slave),
 		one:        make(chan bool),
 		picked:     make(chan *Slave),
+		masterWork: mw,
 	}
 }
 
 func (w *WSContext) randomRetrieve() *Slave {
 	l := len(w.slaveList)
-	idx := rand.Intn(l + 1)
-	log.Debug("we have ", l, " slaves, random idx is ", idx)
+	if l == 0 {
+		return nil
+	}
+	m := l
+	if w.masterWork {
+		m++
+	}
+	idx := rand.Intn(m)
 	if idx == l {
 		return nil
 	}
@@ -60,6 +72,7 @@ func (w *WSContext) Run() {
 				log.Info("Registered a slave server ", s.conn.RemoteAddr())
 				w.slaves[s] = true
 				w.slaveList = append(w.slaveList, s)
+				sort.Sort(w.slaveList)
 			}
 		case s := <-w.unregister:
 			if _, ok := w.slaves[s]; ok {
@@ -69,6 +82,7 @@ func (w *WSContext) Run() {
 				for key := range w.slaves {
 					w.slaveList = append(w.slaveList, key)
 				}
+				sort.Sort(w.slaveList)
 			}
 		case <-w.one:
 			w.picked <- w.randomRetrieve()
@@ -103,4 +117,19 @@ func WSConnHandle(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
 	ctx.register <- slave
 
 	slave.run()
+}
+
+func WSStatusHandle(ctx *WSContext, w http.ResponseWriter, r *http.Request) {
+	var data []*SlaveStatus
+	for _, slave := range ctx.slaveList {
+		data = append(data, &(slave.status))
+	}
+
+	bts, err := json.Marshal(&data)
+	if err != nil {
+		log.Error("failed to marshal a json object, err: ", err)
+		w.Write([]byte("{}"))
+	} else {
+		w.Write(bts)
+	}
 }

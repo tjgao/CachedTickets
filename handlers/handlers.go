@@ -48,7 +48,7 @@ type ticketPriceJSON struct {
 }
 
 const (
-	queryEntry string = "leftTicket/queryO"
+	queryEntry string = "leftTicket/query"
 	priceEntry string = "leftTicket/queryTicketPrice"
 )
 

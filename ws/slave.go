@@ -13,6 +13,15 @@ type writeJob struct {
 	transID int64
 }
 
+type SlaveStatus struct {
+	Addr        string
+	TotalReq    uint
+	Failed      uint
+	Timeout     uint
+	AvgTime     int64
+	RunningTime int64
+}
+
 type Slave struct {
 	ctx         *WSContext
 	conn        *websocket.Conn
@@ -22,6 +31,7 @@ type Slave struct {
 	pendingJobs map[int64]*writeJob
 	nextTransID int64
 	exit        chan struct{}
+	status      SlaveStatus
 }
 
 func newSlave(w *WSContext, c *websocket.Conn) *Slave {
@@ -82,7 +92,7 @@ OUTSIDE:
 			} else {
 				err := s.conn.WriteMessage(websocket.BinaryMessage, b)
 				if err != nil {
-					log.Printf("failed to write message: %v\n")
+					log.Error("failed to write message: ", err)
 				}
 			}
 		case <-s.exit:
@@ -143,11 +153,15 @@ func (s *Slave) writeData(m *Message) (*Message, error) {
 	case msg := <-job.resp:
 		return msg, nil
 	case <-time.After(10 * time.Second):
+		s.status.Timeout++
 		return nil, errors.New("timeout while waiting for response")
 	}
 }
 
 func (s *Slave) DoTask(url string) (*TaskResult, error) {
+	s.status.TotalReq++
+	start := time.Now()
+
 	t := Task{
 		TargetURL: url,
 	}
@@ -165,10 +179,12 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 	resp, e := s.writeData(&m)
 	if e != nil {
 		log.Error("failed to write data: ", err)
+		s.status.Failed++
 		return nil, e
 	}
 
 	if resp.ID != TaskResultType {
+		s.status.Failed++
 		return nil, errors.New("Task result does not contain correct ID")
 	}
 
@@ -177,5 +193,25 @@ func (s *Slave) DoTask(url string) (*TaskResult, error) {
 	if e != nil {
 		log.Panic("failed to decode task result")
 	}
+	s.status.RunningTime += (time.Since(start).Nanoseconds() / (int64)(time.Millisecond))
+	s.status.AvgTime = s.status.RunningTime * 1.0 / (int64)(s.status.TotalReq-s.status.Failed)
 	return &tr, nil
+}
+
+// sort support for slice of slaves
+type SlaveSlice []*Slave
+
+func (ss SlaveSlice) Len() int { return len(ss) }
+
+func (ss SlaveSlice) Swap(i, j int) { ss[i], ss[j] = ss[j], ss[i] }
+
+func (ss SlaveSlice) Less(i, j int) bool {
+	if ss[i].status.Addr < ss[j].status.Addr {
+		return true
+	}
+	if ss[i].status.Addr > ss[j].status.Addr {
+		return false
+	}
+
+	return ss[i].status.TotalReq < ss[j].status.TotalReq
 }

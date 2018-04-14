@@ -25,6 +25,7 @@ func main() {
 	port := flag.Int("p", 8086, "Port to serve on")
 	logfile := flag.String("f", "", "Log file path")
 	slaveSupport := flag.Bool("s", false, "Turn on slave mode")
+	masterWork := flag.Bool("m", false, "whether master server works on requests")
 	logLevel := flag.String("l", "info", "specify log level, available levels are: panic, error, warn, info and debug")
 
 	flag.Parse()
@@ -55,7 +56,7 @@ func main() {
 	var ctx *ws.WSContext
 
 	if *slaveSupport {
-		ctx = ws.NewWSContext()
+		ctx = ws.NewWSContext(*masterWork)
 		go ctx.Run()
 	}
 	env := &handlers.AppEnv{
@@ -72,6 +73,10 @@ func main() {
 		r.HandleFunc("/ws/register", func(w http.ResponseWriter, r *http.Request) {
 			ws.WSConnHandle(ctx, w, r)
 		})
+		r.HandleFunc("/ws/status", func(w http.ResponseWriter, r *http.Request) {
+			ws.WSStatusHandle(ctx, w, r)
+		})
+		http.Handle("/ws/info", http.FileServer(http.Dir("./ws_info/")))
 	}
 	http.Handle("/", r)
 
