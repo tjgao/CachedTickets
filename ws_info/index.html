@@ -1,0 +1,47 @@
+
+<html>
+    <head>
+        <script
+        src="https://code.jquery.com/jquery-3.3.1.min.js"
+        integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+        crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"></link>
+    </head>
+    <title>Slave status</title>
+    <body>
+        <div>
+            <p>
+        Download Slave server here! <a href="slave.mac">Mac</a>, <a href="slave.linux">Linux</a> and <a href="slave.exe">Windows</a>.
+            </p>
+            <p>
+                Please run slave.mac(/exe/linux) -h to know how to use it.
+            </p>
+            <p>
+                You can simply run slave.mac -l debug -u ws://china-diy-travel.com:8086/ws/register. When it connects to server successfully, your computer will take requests from the master server and work like a slave :)
+            </p>
+        </div>
+        <button id="refresh_btn">refresh</button>
+        <div id="slaveInfo">
+        </div>
+    </body>
+    <script>
+     $(document).ready(function() {
+         $('#refresh_btn').click(function() {
+             $.getJSON('/ws/status', function(data){
+                 var html = "<table class='table'><tr><td>address</td><td>total requests</td><td>failed requests</td><td>timeout requests</td><td>average time</td></tr>";
+                 $.each(data, function(idx, val) {
+                     var line = "<tr>"; 
+                     line += "<td>" + val.Addr + "</td>";
+                     line += "<td>" + val.TotalReq + "</td>";
+                     line += "<td>" + val.Failed + "</td>";
+                     line += "<td>" + val.Timeout + "</td>";
+                     line += "<td>" + val.AvgTime + "</td>";
+                     line += "</tr>";
+                     html += line;
+                 });
+                 $('#slaveInfo').html(html);
+             });
+         })
+     });
+    </script>
+</html>

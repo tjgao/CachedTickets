@@ -70,6 +70,7 @@ func (w *WSContext) Run() {
 				log.Error("error: trying to register a registered slave")
 			} else {
 				log.Info("Registered a slave server ", s.conn.RemoteAddr())
+				s.status.Addr = s.conn.RemoteAddr().String()
 				w.slaves[s] = true
 				w.slaveList = append(w.slaveList, s)
 				sort.Sort(w.slaveList)

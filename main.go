@@ -76,7 +76,7 @@ func main() {
 		r.HandleFunc("/ws/status", func(w http.ResponseWriter, r *http.Request) {
 			ws.WSStatusHandle(ctx, w, r)
 		})
-		http.Handle("/ws/info", http.FileServer(http.Dir("./ws_info/")))
+		http.Handle("/ws/info/", http.StripPrefix("/ws/info/", http.FileServer(http.Dir("./ws_info/"))))
 	}
 	http.Handle("/", r)
 
