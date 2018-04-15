@@ -31,7 +31,7 @@ type ticketsData struct {
 
 type leftTicketsJSON struct {
 	HTTPStatus int         `json:"httpstatus"`
-	Messages   string      `json:"messages"`
+	Messages   []string    `json:"messages"`
 	Status     bool        `json:"status"`
 	Data       ticketsData `json:"data"`
 	UpdateTime int64       `json:"updatetime"`
@@ -101,7 +101,7 @@ func (env *AppEnv) grab12306(ch chan []byte, url string) []byte {
 			}
 			return ret
 		}
-		log.Debug("master takes the task")
+		log.Debug("master takes the request: ", url)
 	}
 	return grab12306L(ch, url)
 }
@@ -192,6 +192,7 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 			res := string(b)
 			js, err := verifyTicketPrice(&res)
 			if err != nil {
+				log.Error("failed to verify ticket price json, ", res, err)
 				env.getTicketPriceFromDB(w, &t)
 			} else {
 				w.Write([]byte(res))
@@ -267,46 +268,60 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 		select {
 		case b := <-ch:
 			res := string(b)
-			msg := new(urlChangeMsg)
-			err := json.Unmarshal([]byte(res), &msg)
-			if err != nil {
+			js, e := verifyTickets(&res)
+			if e != nil {
+				log.Error("ticket json is invalid: ", res, e)
 				env.getTicketsFromDB(w, &t)
-				return
+			} else {
+				w.Write([]byte(res))
+				e = env.saveTicketsToDB(&t, js)
+				if e != nil {
+					log.Warn("failed to write data into db: ", e)
+				}
 			}
-			if !msg.Status && len(msg.URL) > 0 {
-				newurl := "https://kyfw.12306.cn/otn/" + msg.URL + "?leftTicketDTO.train_date=" +
-					date + "&leftTicketDTO.from_station=" + from + "&leftTicketDTO.to_station=" +
-					to + "&purpose_codes=" + codes
+			/*
+				log.Info(res)
+				msg := new(urlChangeMsg)
+				err := json.Unmarshal([]byte(res), &msg)
+				if err != nil {
+					env.getTicketsFromDB(w, &t)
+					return
+				}
+				if !msg.Status && len(msg.URL) > 0 {
+					newurl := "https://kyfw.12306.cn/otn/" + msg.URL + "?leftTicketDTO.train_date=" +
+						date + "&leftTicketDTO.from_station=" + from + "&leftTicketDTO.to_station=" +
+						to + "&purpose_codes=" + codes
 
-				newch := make(chan []byte)
-				go env.grab12306(newch, newurl)
-				select {
-				case nb := <-newch:
-					newres := string(nb)
-					js, e := verifyTickets(&newres)
+					newch := make(chan []byte)
+					go env.grab12306(newch, newurl)
+					select {
+					case nb := <-newch:
+						newres := string(nb)
+						js, e := verifyTickets(&newres)
+						if e != nil {
+							env.getTicketsFromDB(w, &t)
+						} else {
+							w.Write([]byte(newres))
+							env.saveTicketsToDB(&t, js)
+						}
+					case <-time.After(time.Second * 10):
+						log.Warn("Timeout !")
+						env.getTicketsFromDB(w, &t)
+					}
+
+				} else {
+					js, e := verifyTickets(&res)
 					if e != nil {
 						env.getTicketsFromDB(w, &t)
 					} else {
-						w.Write([]byte(newres))
-						env.saveTicketsToDB(&t, js)
-					}
-				case <-time.After(time.Second * 10):
-					log.Warn("Timeout !")
-					env.getTicketsFromDB(w, &t)
-				}
-
-			} else {
-				js, e := verifyTickets(&res)
-				if e != nil {
-					env.getTicketsFromDB(w, &t)
-				} else {
-					w.Write([]byte(res))
-					e = env.saveTicketsToDB(&t, js)
-					if e != nil {
-						log.Warn("failed to write data into db: ", e)
+						w.Write([]byte(res))
+						e = env.saveTicketsToDB(&t, js)
+						if e != nil {
+							log.Warn("failed to write data into db: ", e)
+						}
 					}
 				}
-			}
+			*/
 		case <-time.After(time.Second * 10):
 			log.Warn("Timeout !")
 			env.getTicketsFromDB(w, &t)
