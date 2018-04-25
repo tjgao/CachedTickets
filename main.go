@@ -69,6 +69,9 @@ func main() {
 	r.HandleFunc("/queryTicketPrice", env.QueryTicketPriceHandler)
 	r.HandleFunc("/", env.ShowWorkingHandler)
 	r.HandleFunc("/update_cache", env.UpdateCacheHandler)
+	r.HandleFunc("/config/current_api", env.Current12306APIHandler)
+	r.HandleFunc("/config/update_api", env.Update12306APIHandler)
+
 	if *slaveSupport {
 		r.HandleFunc("/ws/register", func(w http.ResponseWriter, r *http.Request) {
 			ws.WSConnHandle(ctx, w, r)
@@ -78,6 +81,7 @@ func main() {
 		})
 		http.Handle("/ws/info/", http.StripPrefix("/ws/info/", http.FileServer(http.Dir("./ws_info/"))))
 	}
+	http.Handle("/config", http.StripPrefix("/config", http.FileServer(http.Dir("./config"))))
 	http.Handle("/", r)
 
 	log.Info("Cached Proxy Server starts up, serving on port: ", *port)

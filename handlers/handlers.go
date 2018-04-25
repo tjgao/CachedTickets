@@ -6,10 +6,13 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net/http"
+	"sync/atomic"
 	"time"
+	"unsafe"
 )
 
 type AppEnv struct {
@@ -31,7 +34,7 @@ type ticketsData struct {
 
 type leftTicketsJSON struct {
 	HTTPStatus int         `json:"httpstatus"`
-	Messages   []string    `json:"messages"`
+	Messages   interface{} `json:"messages"`
 	Status     bool        `json:"status"`
 	Data       ticketsData `json:"data"`
 	UpdateTime int64       `json:"updatetime"`
@@ -42,15 +45,26 @@ type ticketPriceJSON struct {
 	Status                 bool                   `json:"status"`
 	HTTPStatus             int                    `json:"httpstatus"`
 	Data                   map[string]interface{} `json:"data"`
-	Messages               []string               `json:"messages"`
+	Messages               interface{}            `json:"messages"`
 	ValidateMessages       interface{}            `json:"validateMessages"`
 	UpdateTime             int64                  `json:"updatetime"`
 }
 
 const (
-	queryEntry string = "leftTicket/query"
-	priceEntry string = "leftTicket/queryTicketPrice"
+	queryEntryDefault string = "leftTicket/query"
+	priceEntryDefault string = "leftTicket/queryTicketPrice"
 )
+
+type api12306 struct {
+	queryEntry string
+	priceEntry string
+}
+
+var shared_api *api12306
+
+func init() {
+	shared_api = &api12306{queryEntryDefault, priceEntryDefault}
+}
 
 func getQueryParam(r *http.Request, name string) string {
 	value, existed := r.Form[name]
@@ -112,6 +126,29 @@ func (env *AppEnv) UpdateCacheHandler(w http.ResponseWriter, r *http.Request) {
 
 func (env *AppEnv) ShowWorkingHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info(w, "Cached Proxy Server is running!")
+}
+
+func (env *AppEnv) Current12306APIHandler(w http.ResponseWriter, r *http.Request) {
+	json := fmt.Sprintf(`{"ticket":"%s", "price":"%s"}`, shared_api.queryEntry, shared_api.priceEntry)
+	w.Write([]byte(json))
+}
+
+func (env *AppEnv) Update12306APIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		query := getQueryParam(r, "ticket")
+		price := getQueryParam(r, "price")
+		if len(query)*len(price) == 0 {
+			w.Write([]byte(`Not enough params`))
+		} else {
+			t := &api12306{query, price}
+			p := (*unsafe.Pointer)(unsafe.Pointer(&shared_api))
+			atomic.SwapPointer(p, unsafe.Pointer(t))
+			w.Write([]byte(`OK`))
+		}
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
 }
 
 func (env *AppEnv) saveTicketPriceToDB(t *ticketdata.TicketPriceEntity, js *ticketPriceJSON) error {
@@ -177,7 +214,7 @@ func (env *AppEnv) QueryTicketPriceHandler(w http.ResponseWriter, r *http.Reques
 		log.Warn("No enough params")
 		w.Write([]byte("{}"))
 	} else {
-		url := "https://kyfw.12306.cn/otn/" + priceEntry + "?train_no=" + trainNo +
+		url := "https://kyfw.12306.cn/otn/" + shared_api.priceEntry + "?train_no=" + trainNo +
 			"&from_station_no=" + from + "&to_station_no=" + to + "&seat_types=" + seatType +
 			"&train_date=" + date
 
@@ -256,7 +293,7 @@ func (env *AppEnv) QueryHandler(w http.ResponseWriter, r *http.Request) {
 		log.Warn("no enough params")
 		w.Write([]byte("Error, no enough params"))
 	} else {
-		url := "https://kyfw.12306.cn/otn/" + queryEntry + "?leftTicketDTO.train_date=" +
+		url := "https://kyfw.12306.cn/otn/" + shared_api.queryEntry + "?leftTicketDTO.train_date=" +
 			date + "&leftTicketDTO.from_station=" + from + "&leftTicketDTO.to_station=" +
 			to + "&purpose_codes=" + codes
 
