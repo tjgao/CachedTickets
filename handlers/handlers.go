@@ -151,6 +151,22 @@ func (env *AppEnv) Update12306APIHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+func (env *AppEnv) Update12306TrainLineHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		from_station := getQueryParam(r, "from_station")
+		to_station := getQueryParam(r, "to_station")
+		content := getQueryParam(r, "content")
+		if len(from_station) == 0 || len(to_station) == 0 || len(content) == 0 {
+			w.Write([]byte(`Not enough params`))
+		} else {
+
+		}
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+}
+
 func (env *AppEnv) saveTicketPriceToDB(t *ticketdata.TicketPriceEntity, js *ticketPriceJSON) error {
 	js.UpdateTime = time.Now().Unix()
 	bs, err := json.Marshal(&js)
