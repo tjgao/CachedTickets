@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"CachedTickets/ticketdata"
-	"CachedTickets/ws"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/tjgao/CachedTickets/ticketdata"
+	"github.com/tjgao/CachedTickets/ws"
 	"io/ioutil"
 	"net/http"
 	"sync/atomic"
@@ -164,7 +164,7 @@ func (env *AppEnv) Update12306TrainLineHandler(w http.ResponseWriter, r *http.Re
 			t := ticketdata.TicketEntity{Id: 0, From: from_station, To: to_station, Date: travel_date, Content: content, UpdateTime: time.Now()}
 			e := env.Db.SaveLeftTickets(t)
 			if e != nil {
-				log.Warn("Failed to update train line info");
+				log.Warn("Failed to update train line info")
 				w.Write([]byte(`Failed to update train line info`))
 			}
 		}
