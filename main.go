@@ -71,6 +71,8 @@ func main() {
 	r.HandleFunc("/update_cache", env.UpdateCacheHandler)
 	r.HandleFunc("/config/current_api", env.Current12306APIHandler)
 	r.HandleFunc("/config/update_api", env.Update12306APIHandler)
+	r.HandleFunc("/config/update_line", env.Update12306TrainLineHandler)
+
 
 	if *slaveSupport {
 		r.HandleFunc("/ws/register", func(w http.ResponseWriter, r *http.Request) {

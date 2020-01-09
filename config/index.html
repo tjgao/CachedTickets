@@ -32,6 +32,11 @@
 			</dl>
 
 			<dl class="form-group">
+				<dt class="input-label"><label>travel date</label></dt>
+				<dd><input id="travel_date"></input></dd>
+			</dl>
+
+			<dl class="form-group">
 				<dt class="input-label"><label>content</label></dt>
 				<dd><textarea id="content" style="width:100%"></textarea></dd>
 			</dl>
@@ -49,22 +54,50 @@
 
 	</body>
 	<script>
-		var refresh = function() {
-        $.get('/config/current_api', {}, function(data){
-            var obj = JSON.parse(data)
-            $('#ticket_input').val(obj.ticket);
-            $('#price_input').val(obj.price);
-        })
+		function add_days(date, days) {
+			return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 		}
+
+		function date_in_days(date, days) {
+			d = add_days(date, days);
+			year = d.getFullYear();
+			month = d.getMonth() + 1; 
+			month = month > 9 ? (month + '') : ('0' + month);
+			day = d.getDate();
+			day = day > 9 ? (day + '') : ('0' + day);
+			return year + '-' + month + '-' + day;
+		}
+
+		var refresh = function() {
+			$('#travel_date').val(date_in_days(new Date(), 10));
+
+			$.get('/config/current_api', {}, function(data){
+				var obj = JSON.parse(data)
+				$('#ticket_input').val(obj.ticket);
+				$('#price_input').val(obj.price);
+			})
+		}
+
 		$(document).ready(function(){
 			refresh();
 			$('#submitbtn').click(function() {
 				var ticket_val = $('#ticket_input').val(); 
 				var price_val = $('#price_input').val(); 
 				$.post('/config/update_api', {ticket:ticket_val, price:price_val}, function(data){
-					$('#result').val(data)
+					$('#result').val(data);
+				});
+			});
+
+			$('#updatebtn').click(function(){
+				var from_station = $('#from_station').val();
+				var to_station = $('#to_station').val();
+				var content = $('#content').val();
+				var travel_date = $('#travel_date').val();
+				$.post('/config/update_line', {from_station:from_station, to_station:to_station, content: content, travel_date, travel_date}, function(data){
+					$('#result').val(data);
 				});
 			});
 		});
 	</script>
+
 </html>
