@@ -161,11 +161,20 @@ func (env *AppEnv) Update12306TrainLineHandler(w http.ResponseWriter, r *http.Re
 		if len(from_station) == 0 || len(to_station) == 0 || len(content) == 0 {
 			w.Write([]byte(`Not enough params`))
 		} else {
-			t := ticketdata.TicketEntity{Id: 0, From: from_station, To: to_station, Date: travel_date, Content: content, UpdateTime: time.Now()}
-			e := env.Db.SaveLeftTickets(t)
+			js, e := verifyTickets(&content)
 			if e != nil {
-				log.Warn("Failed to update train line info")
-				w.Write([]byte(`Failed to update train line info`))
+				log.Warn("Failed to validate train line info")
+				w.Write([]byte(`Failed to validate train line info`))
+			} else {
+				t := ticketdata.TicketEntity{Id: 0, From: from_station, To: to_station, Date: travel_date, Content: content, UpdateTime: time.Now()}
+				e = env.saveTicketsToDB(&t, js)
+				if e != nil {
+					log.Warn("Failed to update train line info")
+					w.Write([]byte(`Failed to update train line info`))
+				} else {
+					log.Info("Successfully updated train line info")
+					w.Write([]byte(`Successfully updated train line info`))
+				}
 			}
 		}
 	} else {
