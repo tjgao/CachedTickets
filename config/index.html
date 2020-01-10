@@ -31,6 +31,9 @@
 							<dl class="form-group">
 							<button id="api_submit" class="btn btn-primary btn-large f4 btn-block">submit</button>
 							</dl>
+							<dl>
+							<textarea id="api_result" readonly></textarea>
+							</dl>
 						</div>
 						<div class="tab-pane fade" id="nav-profile" role="tabpanel" aria-labelledby="nav-profile-tab">
 							<dl class="form-group">
@@ -54,6 +57,9 @@
 							</dl>
 							<dl class="form-group">
 							<button id="line_submit" class="btn btn-primary btn-large f4 btn-block">submit</button>
+							</dl>
+							<dl>
+							<textarea id="line_result" readonly></textarea>
 							</dl>
 						</div>
 						<div class="tab-pane fade" id="nav-contact" role="tabpanel" aria-labelledby="nav-contact-tab">
@@ -85,13 +91,16 @@
 							<dl class="form-group">
 							<button id="price_submit" class="btn btn-primary btn-large f4 btn-block">submit</button>
 							</dl>
+
+							<dl>
+							<textarea id="price_result" readonly></textarea>
+							</dl>
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
 	</section>
-	<textarea id="result" readonly></textarea>
 
 	</body>
 	<script>
@@ -125,7 +134,7 @@
 				var ticket_val = $('#ticket_input').val(); 
 				var price_val = $('#price_input').val(); 
 				$.post('/config/update_api', {ticket:ticket_val, price:price_val}, function(data){
-					$('#result').val(data);
+					$('#api_result').val(data);
 				});
 			});
 
@@ -135,7 +144,7 @@
 				var content = $('#content').val();
 				var travel_date = $('#travel_date').val();
 				$.post('/config/update_line', {from_station:from_station, to_station:to_station, content: content, travel_date, travel_date}, function(data){
-					$('#result').val(data);
+					$('#line_result').val(data);
 				});
 			});
 
@@ -146,7 +155,7 @@
 				var seat_type = $('#seat_type').val();
 				var content = $('#price_content').val();
 				$.post('/config/update_price', {train_no:train_no, from_station_no:from_station_no, to_station_no:to_station_no,seat_type:seat_type, content:content}, function(data){
-					$('#result').val(data);
+					$('#price_result').val(data);
 				});
 			});
 		});
