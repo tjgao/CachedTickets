@@ -168,7 +168,7 @@ func (env *AppEnv) Update12306TicketPriceHandler(w http.ResponseWriter, r *http.
 				w.Write([]byte(`Failed to validate ticket price info`))
 			} else {
 				t := ticketdata.TicketPriceEntity{Id: 0, TrainNo: train_no, FromStationNo: from_station_no, ToStationNo: to_station_no, SeatTypes: seat_type, Content: content, UpdateTime: time.Now()}
-				e = env.SaveTicketPriceToDB(&t, js)
+				e = env.saveTicketPriceToDB(&t, js)
 				if e != nil {
 					log.Warn("Failed to update ticket price info")
 					w.Write([]byte(`Failed to update train line info`))
