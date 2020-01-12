@@ -1,11 +1,11 @@
 package main
 
 import (
-	"CachedTickets/handlers"
-	"CachedTickets/ticketdata"
-	"CachedTickets/ws"
 	"flag"
 	log "github.com/sirupsen/logrus"
+	"github.com/tjgao/CachedTickets/handlers"
+	"github.com/tjgao/CachedTickets/ticketdata"
+	"github.com/tjgao/CachedTickets/ws"
 	"net/http"
 	"os"
 	"strconv"
@@ -71,6 +71,8 @@ func main() {
 	r.HandleFunc("/update_cache", env.UpdateCacheHandler)
 	r.HandleFunc("/config/current_api", env.Current12306APIHandler)
 	r.HandleFunc("/config/update_api", env.Update12306APIHandler)
+	r.HandleFunc("/config/update_line", env.Update12306TrainLineHandler)
+	r.HandleFunc("/config/update_price", env.Update12306TicketPriceHandler)
 
 	if *slaveSupport {
 		r.HandleFunc("/ws/register", func(w http.ResponseWriter, r *http.Request) {

@@ -1,44 +1,169 @@
 <html>
 	<head>
-        <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
-		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous"></link>
+
+		<link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+		<link rel="stylesheet" href="style.css">
+		<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
 	</head>
-	<title>Configure 12306 API</title>
 	<body>
-		<div style="width:20%">
-			<dl class="form-group">
-				<dt class="input-label"><label>ticket query interface</label></dt>
-				<dd><input id="ticket_input"></input></dd>
-			</dl>
-			<dl class="form-group">
-				<dt class="input-label"><label>price query interface</label></dt>
-				<dd><input id="price_input"></input></dd>
-			</dl>
-			<dl class="form-group">
-			<button id="submitbtn" class="btn btn-primary btn-large f4 btn-block">submit</button>
-			</dl>
-			<dl>
-				<textarea id="result"></textarea>
-			</dl>
+	<section id="tabs" class="project-tab">
+		<div class="container">
+			<div class="row">
+				<div class="col-md-12">
+					<nav>
+						<div class="nav nav-tabs nav-fill" id="nav-tab" role="tablist">
+							<a class="nav-item nav-link active" id="nav-home-tab" data-toggle="tab" href="#nav-home" role="tab" aria-controls="nav-home" aria-selected="true">12306 api</a>
+							<a class="nav-item nav-link" id="nav-profile-tab" data-toggle="tab" href="#nav-profile" role="tab" aria-controls="nav-profile" aria-selected="false">12306 train line</a>
+							<a class="nav-item nav-link" id="nav-contact-tab" data-toggle="tab" href="#nav-contact" role="tab" aria-controls="nav-contact" aria-selected="false">12306 ticket info</a>
+						</div>
+					</nav>
+					<div class="tab-content" id="nav-tabContent">
+						<div class="tab-pane fade show active" id="nav-home" role="tabpanel" aria-labelledby="nav-home-tab">
+							<dl class="form-group">
+								<dt class="input-label"><label>ticket query interface</label></dt>
+								<dd><input id="ticket_input"></input></dd>
+							</dl>
+							<dl class="form-group">
+								<dt class="input-label"><label>price query interface</label></dt>
+								<dd><input id="price_input"></input></dd>
+							</dl>
+							<dl class="form-group">
+							<button id="api_submit" class="btn btn-primary btn-large f4 btn-block">submit</button>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>result</label></dt>
+								<dd><textarea id="api_result" readonly style="width:100%"></textarea></dd>
+							</dl>
+						</div>
+						<div class="tab-pane fade" id="nav-profile" role="tabpanel" aria-labelledby="nav-profile-tab">
+							<dl class="form-group">
+								<dt class="input-label"><label>from station</label></dt>
+								<dd><input id="from_station"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>to station</label></dt>
+								<dd><input id="to_station"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>travel date</label></dt>
+								<dd><input id="travel_date"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>content</label></dt>
+								<dd><textarea id="content" style="width:100%"></textarea></dd>
+							</dl>
+							<dl class="form-group">
+							<button id="line_submit" class="btn btn-primary btn-large f4 btn-block">submit</button>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>result</label></dt>
+								<dd><textarea id="line_result" readonly style="width:100%"></textarea></dd>
+							</dl>
+						</div>
+						<div class="tab-pane fade" id="nav-contact" role="tabpanel" aria-labelledby="nav-contact-tab">
+							<dl class="form-group">
+								<dt class="input-label"><label>train no</label></dt>
+								<dd><input id="train_no"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>from station no</label></dt>
+								<dd><input id="from_station_no"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>to station no</label></dt>
+								<dd><input id="to_station_no"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>seat type</label></dt>
+								<dd><input id="seat_type"></input></dd>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>content</label></dt>
+								<dd><textarea id="price_content" style="width:100%"></textarea></dd>
+							</dl>
+
+							<dl class="form-group">
+							<button id="price_submit" class="btn btn-primary btn-large f4 btn-block">submit</button>
+							</dl>
+
+							<dl class="form-group">
+								<dt class="input-label"><label>result</label></dt>
+								<dd><textarea id="price_result" readonly style="width:100%"></textarea></dd>
+							</dl>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
+	</section>
+
 	</body>
 	<script>
-		var refresh = function() {
-        $.get('/config/current_api', {}, function(data){
-            var obj = JSON.parse(data)
-            $('#ticket_input').val(obj.ticket);
-            $('#price_input').val(obj.price);
-        })
+		function add_days(date, days) {
+			return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 		}
+
+		function date_in_days(date, days) {
+			d = add_days(date, days);
+			year = d.getFullYear();
+			month = d.getMonth() + 1; 
+			month = month > 9 ? (month + '') : ('0' + month);
+			day = d.getDate();
+			day = day > 9 ? (day + '') : ('0' + day);
+			return year + '-' + month + '-' + day;
+		}
+
+		var refresh = function() {
+			$('#travel_date').val(date_in_days(new Date(), 10));
+
+			$.get('/config/current_api', {}, function(data){
+				var obj = JSON.parse(data)
+				$('#ticket_input').val(obj.ticket);
+				$('#price_input').val(obj.price);
+			})
+		}
+
 		$(document).ready(function(){
 			refresh();
-			$('#submitbtn').click(function() {
+			$('#api_submit').click(function() {
 				var ticket_val = $('#ticket_input').val(); 
 				var price_val = $('#price_input').val(); 
 				$.post('/config/update_api', {ticket:ticket_val, price:price_val}, function(data){
-					$('#result').val(data)
+					$('#api_result').val(data);
+				});
+			});
+
+			$('#line_submit').click(function(){
+				var from_station = $('#from_station').val();
+				var to_station = $('#to_station').val();
+				var content = $('#content').val();
+				var travel_date = $('#travel_date').val();
+				$.post('/config/update_line', {from_station:from_station, to_station:to_station, content: content, travel_date, travel_date}, function(data){
+					$('#line_result').val(data);
+				});
+			});
+
+			$('#price_submit').click(function(){
+				var train_no = $('#train_no').val();
+				var from_station_no = $('#from_station_no').val();
+				var to_station_no = $('#to_station_no').val();
+				var seat_type = $('#seat_type').val();
+				var content = $('#price_content').val();
+				$.post('/config/update_price', {train_no:train_no, from_station_no:from_station_no, to_station_no:to_station_no,seat_type:seat_type, price_content:content}, function(data){
+					$('#price_result').val(data);
 				});
 			});
 		});
 	</script>
+
 </html>

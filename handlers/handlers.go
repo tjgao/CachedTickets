@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"CachedTickets/ticketdata"
-	"CachedTickets/ws"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/tjgao/CachedTickets/ticketdata"
+	"github.com/tjgao/CachedTickets/ws"
 	"io/ioutil"
 	"net/http"
 	"sync/atomic"
@@ -145,6 +145,67 @@ func (env *AppEnv) Update12306APIHandler(w http.ResponseWriter, r *http.Request)
 			p := (*unsafe.Pointer)(unsafe.Pointer(&shared_api))
 			atomic.SwapPointer(p, unsafe.Pointer(t))
 			w.Write([]byte(`OK`))
+		}
+	} else {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+	}
+}
+
+func (env *AppEnv) Update12306TicketPriceHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		train_no := getQueryParam(r, "train_no")
+		from_station_no := getQueryParam(r, "from_station_no")
+		to_station_no := getQueryParam(r, "to_station_no")
+		seat_type := getQueryParam(r, "seat_type")
+		content := getQueryParam(r, "price_content")
+		if len(train_no) == 0 || len(from_station_no) == 0 || len(to_station_no) == 0 || len(seat_type) == 0 || len(content) == 0 {
+			w.Write([]byte(`Not enough params`))
+		} else {
+			js, e := verifyTicketPrice(&content)
+			if e != nil {
+				log.Warn("Failed to validate ticket price info")
+				w.Write([]byte(`Failed to validate ticket price info`))
+			} else {
+				t := ticketdata.TicketPriceEntity{Id: 0, TrainNo: train_no, FromStationNo: from_station_no, ToStationNo: to_station_no, SeatTypes: seat_type, Content: content, UpdateTime: time.Now()}
+				e = env.saveTicketPriceToDB(&t, js)
+				if e != nil {
+					log.Warn("Failed to update ticket price info")
+					w.Write([]byte(`Failed to update train line info`))
+				} else {
+					log.Info("Successfully updated ticket price info")
+					w.Write([]byte(`Successfully updated ticket price info`))
+				}
+			}
+		}
+	}
+}
+
+func (env *AppEnv) Update12306TrainLineHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		from_station := getQueryParam(r, "from_station")
+		to_station := getQueryParam(r, "to_station")
+		travel_date := getQueryParam(r, "travel_date")
+		content := getQueryParam(r, "content")
+		if len(from_station) == 0 || len(to_station) == 0 || len(content) == 0 {
+			w.Write([]byte(`Not enough params`))
+		} else {
+			js, e := verifyTickets(&content)
+			if e != nil {
+				log.Warn("Failed to validate train line info")
+				w.Write([]byte(`Failed to validate train line info`))
+			} else {
+				t := ticketdata.TicketEntity{Id: 0, From: from_station, To: to_station, Date: travel_date, Content: content, UpdateTime: time.Now()}
+				e = env.saveTicketsToDB(&t, js)
+				if e != nil {
+					log.Warn("Failed to update train line info")
+					w.Write([]byte(`Failed to update train line info`))
+				} else {
+					log.Info("Successfully updated train line info")
+					w.Write([]byte(`Successfully updated train line info`))
+				}
+			}
 		}
 	} else {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
