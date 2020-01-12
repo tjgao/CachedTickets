@@ -159,7 +159,7 @@
 				var to_station_no = $('#to_station_no').val();
 				var seat_type = $('#seat_type').val();
 				var content = $('#price_content').val();
-				$.post('/config/update_price', {train_no:train_no, from_station_no:from_station_no, to_station_no:to_station_no,seat_type:seat_type, content:content}, function(data){
+				$.post('/config/update_price', {train_no:train_no, from_station_no:from_station_no, to_station_no:to_station_no,seat_type:seat_type, price_content:content}, function(data){
 					$('#price_result').val(data);
 				});
 			});
